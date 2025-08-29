@@ -1,0 +1,38 @@
+version: '3.8'
+services:
+  api:
+    build: .
+    container_name: baseapi
+    ports:
+      - "8088:8088"  # Cambiado a 8080:8080
+    depends_on:
+      - sqlserver
+    environment:
+      - ConnectionStrings__DefaultConnection=Server=sqlserver;Database=BaseApiDb;User Id=sa;Password=YourStrong!Passw0rd;TrustServerCertificate=True;
+      - Jwt__Key=SuperSecretKey123456789012345678901234567890
+      - Jwt__Issuer=BaseApi
+      - Jwt__Audience=BaseApiUsers
+      - ASPNETCORE_URLS=http://+:8088  # Forzar que escuche en 8080
+    networks:
+      - app-network
+
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: sqlserver
+    environment:
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=YourStrong!Passw0rd
+      - MSSQL_PID=Express
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver-data:/var/opt/mssql  # Volumen para persistencia
+    networks:
+      - app-network
+
+volumes:
+  sqlserver-data:
+
+networks:
+  app-network:
+    driver: bridge
