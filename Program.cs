@@ -1,5 +1,6 @@
 using BaseApi.Data;
 using BaseApi.Services;
+using BaseApi.Middleware;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -18,6 +19,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 // ============================
 // 2. Registrar servicios de aplicación
 // ============================
+builder.Services.AddMemoryCache(); // ? AGREGAR MEMORY CACHE
 builder.Services.AddScoped<AuthService>();
 
 // ============================
@@ -62,17 +64,32 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
-    c.SwaggerDoc("v1", new OpenApiInfo { Title = "WebApiBase", Version = "v1" });
+    c.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "BaseApi",
+        Version = "v1",
+        Description = "API con autenticación JWT y sistema de logout",
+        Contact = new OpenApiContact
+        {
+            Name = "Tu Nombre",
+            Email = "tu.email@example.com"
+        }
+    });
 
     // Agregar autorización con JWT en Swagger
     var securitySchema = new OpenApiSecurityScheme
     {
-        Description = "JWT Authorization header using the Bearer scheme. Ejemplo: \"Authorization: Bearer {token}\"",
-        Name = "Authorization",
+        Name = "JWT Authentication",
+        Description = "Ingresa el token JWT en el formato: Bearer {token}",
         In = ParameterLocation.Header,
         Type = SecuritySchemeType.Http,
         Scheme = "bearer",
-        BearerFormat = "JWT"
+        BearerFormat = "JWT",
+        Reference = new OpenApiReference
+        {
+            Type = ReferenceType.SecurityScheme,
+            Id = "Bearer"
+        }
     };
 
     c.AddSecurityDefinition("Bearer", securitySchema);
@@ -102,13 +119,22 @@ using (var scope = app.Services.CreateScope())
 // ============================
 // 8. Middlewares
 // ============================
-if (app.Environment.IsDevelopment())
+app.UseSwagger();
+app.UseSwaggerUI(c =>
 {
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "BaseApi v1");
+    c.RoutePrefix = "swagger";
+    c.DocumentTitle = "BaseApi Documentation";
+    c.EnableDeepLinking();
+    c.DisplayOperationId();
+});
 
 app.UseHttpsRedirection();
+
+// ============================
+// 8.1. MIDDLEWARE DE VALIDACIÓN DE TOKENS (NUEVO) ? IMPORTANTE
+// ============================
+app.UseTokenValidation();
 
 app.UseAuthentication();
 app.UseAuthorization();
@@ -116,7 +142,7 @@ app.UseAuthorization();
 // ============================
 // 9. Endpoints mínimos para testing y diagnóstico
 // ============================
-app.MapGet("/", () => "¡BaseAPI está funcionando! ?? Accede a /swagger para la documentación API.");
+app.MapGet("/", () => "¡BaseAPI está funcionando! Accede a /swagger para la documentación API.");
 app.MapGet("/api/health", () => Results.Ok(new
 {
     status = "Healthy",
@@ -171,13 +197,17 @@ app.MapControllers();
 // ============================
 app.Lifetime.ApplicationStarted.Register(() =>
 {
-    Console.WriteLine("? Application started successfully!");
-    Console.WriteLine("?? Listening on: http://0.0.0.0:8088");
-    Console.WriteLine("?? Auth endpoints:");
+    Console.WriteLine("Application started successfully!");
+    Console.WriteLine("Listening on: http://0.0.0.0:8088");
+    Console.WriteLine("Auth endpoints:");
     Console.WriteLine("   POST /api/auth/register");
     Console.WriteLine("   POST /api/auth/login");
-    Console.WriteLine("?? Health check: GET /api/health");
-    Console.WriteLine("?? Debug: GET /api/debug/config");
+    Console.WriteLine("   POST /api/auth/logout");
+    Console.WriteLine("   POST /api/auth/validate");
+    Console.WriteLine("   GET  /api/auth/me");
+    Console.WriteLine("Health check: GET /api/health");
+    Console.WriteLine("Debug: GET /api/debug/config");
+    Console.WriteLine("Documentation: /swagger");
 });
 
 app.Run();
